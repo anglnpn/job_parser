@@ -84,12 +84,10 @@ class DMBWriteManager:
         """
         with psycopg2.connect(host="localhost", database="parsing_hh_company", user="postgres",
                               password="gdfggta56") as conn:
-
             with conn.cursor() as cur:
                 cur.execute("TRUNCATE TABLE vacancy ")
 
                 for item in self.vacancy_list:
-
                     cur.execute("INSERT INTO company (company_id, company_name) VALUES (%s, %s)"
                                 "ON CONFLICT (company_id) DO NOTHING;",
                                 (int(item["company_id"]), item["company_name"]))
@@ -101,3 +99,87 @@ class DMBWriteManager:
                                  item["payment_to"], item["url"]))
 
             conn.commit()
+
+
+class DMBReadManager:
+    """
+    Класс для получения данных из БД
+    """
+
+    def __init__(self, word):
+        self.conn = psycopg2.connect(host="localhost", database="parsing_hh_company", user="postgres",
+                                     password="gdfggta56")
+        self.word = word
+
+    def get_companies_and_vacancies_count(self):
+        """
+        Подключается к БД.
+        Возвращает список всех компаний и количество вакансий у каждой компании.
+        """
+        cur = self.conn.cursor()
+        cur.execute("SELECT company_name, COUNT(vacancy.company_id) FROM company "
+                    "INNER JOIN vacancy USING(company_id) "
+                    "GROUP BY company_name ")
+        rows = cur.fetchall()
+        cur.close()
+        self.conn.close()
+        return rows
+
+    def get_all_vacancies(self):
+        """
+        Подключается к БД.
+        Возвращает список всех вакансий с указанием названия компании,
+        названия вакансии и зарплаты и ссылки на вакансию
+        """
+        cur = self.conn.cursor()
+        cur.execute("SELECT company.company_name, vacancy_name, payment_from, payment_to, url FROM company "
+                    "INNER JOIN vacancy USING(company_id) "
+                    "GROUP BY company.company_name, vacancy_name, payment_from, payment_to, url "
+                    "ORDER BY company_name ")
+        rows = cur.fetchall()
+        cur.close()
+        self.conn.close()
+        return rows
+
+    def get_avg_salary(self):
+        """
+        Подключается к БД.
+        Возвращает среднюю зарплату по вакансиям.
+        """
+        cur = self.conn.cursor()
+        cur.execute("SELECT ROUND(AVG(payment_from)) FROM vacancy "
+                    "WHERE payment_from > 0 ")
+        rows_1 = cur.fetchall()
+        cur.execute("SELECT ROUND(AVG(payment_to)) FROM vacancy "
+                    "WHERE payment_to > 0 ")
+        rows_2 = cur.fetchall()
+        cur.close()
+        self.conn.close()
+        return rows_1, rows_2
+
+    def get_vacancies_with_higher_salary(self):
+        """
+        Подключается к БД.
+        Возвращает список всех вакансий, у которых зарплата выше средней по всем вакансиям.
+        """
+        cur = self.conn.cursor()
+        cur.execute("SELECT * FROM vacancy WHERE payment_to > (SELECT AVG(payment_to)"
+                    "FROM vacancy WHERE payment_to > 0) ")
+        rows = cur.fetchall()
+        cur.close()
+        self.conn.close()
+        return rows
+
+    def get_vacancies_with_keyword(self):
+        """
+        Подключается к БД.
+        Возвращает список всех вакансий,
+        в названии которых содержатся переданные в метод слова, например python
+        """
+        cur = self.conn.cursor()
+        cur.execute(f"SELECT * FROM vacancy WHERE vacancy_name LIKE '%{self.word}%' ")
+        rows = cur.fetchall()
+        cur.close()
+        self.conn.close()
+        return rows
+
