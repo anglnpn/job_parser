@@ -68,3 +68,36 @@ class HeadHunterAPI:
 
         return self.vacancy_list
 
+
+class DMBWriteManager:
+    """
+    Класс для записи данных в БД
+    При создании экземпляра в него приходит аргумент - список вакансий
+    """
+
+    def __init__(self, vacancy_list):
+        self.vacancy_list = vacancy_list
+
+    def write_to_database(self):
+        """
+        Метод для записи данных из списка вакансий в базу данных
+        """
+        with psycopg2.connect(host="localhost", database="parsing_hh_company", user="postgres",
+                              password="gdfggta56") as conn:
+
+            with conn.cursor() as cur:
+                cur.execute("TRUNCATE TABLE vacancy ")
+
+                for item in self.vacancy_list:
+
+                    cur.execute("INSERT INTO company (company_id, company_name) VALUES (%s, %s)"
+                                "ON CONFLICT (company_id) DO NOTHING;",
+                                (int(item["company_id"]), item["company_name"]))
+
+                    cur.execute("INSERT INTO vacancy (company_id, vacancy_name, payment_from, payment_to, url)"
+                                "VALUES (%s, %s, %s, %s, %s)"
+                                "ON CONFLICT (url) DO NOTHING;",
+                                (int(item["company_id"]), item["vacancy_name"], item["payment_from"],
+                                 item["payment_to"], item["url"]))
+
+            conn.commit()
