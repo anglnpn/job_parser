@@ -38,7 +38,7 @@ class HeadHunterAPI:
             Определяем вводимые параметры запроса
             """
             params = {'employer_id': company["id"],
-                      'per_page': 5}
+                      'per_page': 50}
 
             """
             Выполняем запрос к сайту по API ключу и вводным параметрам
@@ -106,10 +106,10 @@ class DMBReadManager:
     Класс для получения данных из БД
     """
 
-    def __init__(self, word):
+    def __init__(self):
+        self.word = None
         self.conn = psycopg2.connect(host="localhost", database="parsing_hh_company", user="postgres",
                                      password="gdfggta56")
-        self.word = word
 
     def get_companies_and_vacancies_count(self):
         """
@@ -121,9 +121,12 @@ class DMBReadManager:
                     "INNER JOIN vacancy USING(company_id) "
                     "GROUP BY company_name ")
         rows = cur.fetchall()
+
         cur.close()
         self.conn.close()
-        return rows
+
+        company = '\n'.join([f'{item[0]}: {item[1]} вакансий' for item in rows])
+        return company
 
     def get_all_vacancies(self):
         """
@@ -139,7 +142,9 @@ class DMBReadManager:
         rows = cur.fetchall()
         cur.close()
         self.conn.close()
-        return rows
+        vacancy = '\n'.join([f'Компания: {item[0]}. Вакансия: {item[1]}. Заработная плата от {item[2]}'
+                             f' до {item[3]} руб. Ссылка на вакансию {item[4]}\n' for item in rows])
+        return vacancy
 
     def get_avg_salary(self):
         """
@@ -153,9 +158,15 @@ class DMBReadManager:
         cur.execute("SELECT ROUND(AVG(payment_to)) FROM vacancy "
                     "WHERE payment_to > 0 ")
         rows_2 = cur.fetchall()
+
         cur.close()
         self.conn.close()
-        return rows_1, rows_2
+
+        payment_from_avg = ''.join(char for char in str(rows_1) if char.isdigit())
+        payment_to_avg = ''.join(char for char in str(rows_2) if char.isdigit())
+
+        return f'Минимальная средняя заработная плата: {payment_from_avg} руб.\n' \
+               f'Максимальная  средняя заработная плата: {payment_to_avg} руб.'
 
     def get_vacancies_with_higher_salary(self):
         """
@@ -166,20 +177,32 @@ class DMBReadManager:
         cur.execute("SELECT * FROM vacancy WHERE payment_to > (SELECT AVG(payment_to)"
                     "FROM vacancy WHERE payment_to > 0) ")
         rows = cur.fetchall()
+
         cur.close()
         self.conn.close()
-        return rows
 
-    def get_vacancies_with_keyword(self):
+        vacancy = '\n'.join([f'Вакансия: {item[1]}. Заработная плата от {item[2]}'
+                             f' до {item[3]} руб. Ссылка на вакансию {item[4]}\n' for item in rows])
+        return vacancy
+
+    def get_vacancies_with_keyword(self, word):
         """
         Подключается к БД.
         Возвращает список всех вакансий,
         в названии которых содержатся переданные в метод слова, например python
         """
+        self.word = word
         cur = self.conn.cursor()
         cur.execute(f"SELECT * FROM vacancy WHERE vacancy_name LIKE '%{self.word}%' ")
         rows = cur.fetchall()
+
         cur.close()
         self.conn.close()
-        return rows
+
+        if not rows:
+            return 'По вашему запросу найдено 0 вакансий'
+        else:
+            vacancy = '\n'.join([f'Вакансия: {item[1]}. Заработная плата от {item[2]}'
+                                 f' до {item[3]} руб. Ссылка на вакансию {item[4]}\n' for item in rows])
+            return vacancy
 
