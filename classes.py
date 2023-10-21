@@ -78,6 +78,26 @@ class DMBWriteManager:
     def __init__(self, vacancy_list):
         self.vacancy_list = vacancy_list
 
+        # Создание таблиц company и vacancy
+        # При вызове функции в main осуществляется проверка
+        # создана ли таблица
+        try:
+            with psycopg2.connect(host="localhost", database="parsing_hh_company", user="postgres",
+                                  password="gdfggta56") as conn:
+                with conn.cursor() as cur:
+                    cur.execute("CREATE TABLE company (company_id int, company_name varchar);")
+                    cur.execute("CREATE TABLE vacancy (company_id int, vacancy_name varchar, payment_from integer, "
+                                "payment_to integer, url varchar);")
+                    cur.execute("ALTER TABLE company ADD CONSTRAINT unique_company_id UNIQUE (company_id);")
+                    cur.execute("ALTER TABLE vacancy ADD CONSTRAINT unique_vac_url UNIQUE (url);")
+                    cur.execute("ALTER TABLE vacancy ADD CONSTRAINT fk_unique_company_id "
+                                "FOREIGN KEY (company_id) REFERENCES company (company_id);")
+
+                conn.commit()
+
+        except psycopg2.errors.DuplicateTable:
+            print("Таблица уже создана. Продолжение работы. ")
+
     def write_to_database(self):
         """
         Метод для записи данных из списка вакансий в базу данных
@@ -205,4 +225,3 @@ class DMBReadManager:
             vacancy = '\n'.join([f'Вакансия: {item[1]}. Заработная плата от {item[2]}'
                                  f' до {item[3]} руб. Ссылка на вакансию {item[4]}\n' for item in rows])
             return vacancy
-
